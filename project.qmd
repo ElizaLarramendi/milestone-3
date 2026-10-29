@@ -1,5 +1,168 @@
 ---
-title: "Project"
+title: "High School to College Cross-Country Performance"
 format: html
 ---
-Some variables i plan to use is weather, if it was a sunny day or if it was rainy, if it was 90 degrees or if it was 60 degrees , additonally i want to look at the physical course the athletes ran on, for example was it super hilly or was it a flat downhill course.
+
+## Research question
+
+How are runners' high-school 5K times related to their college cross-country
+times, and how might weather and course terrain help explain differences?
+
+## Data collection
+
+I will collect up to 2,000 U.S. college cross-country runners (men and women)
+with results in the five most recent completed seasons, 2021–2025. For each
+runner, I will record their best verified high-school 5K and a college 6K or 8K
+result. Because these are different distances, I will keep the distance with
+each time rather than compare the raw times as if they were equivalent.
+
+TFRRS will be used to find college results. I will verify each high-school 5K
+and record its source link; I will not assume a missing high-school result is
+zero. I will also record the meet, date, weather, and course terrain for both
+selected races where that information is available. Missing weather or terrain
+information will be left blank rather than guessed.
+
+## Data fields
+
+Each row will represent one runner. The planned columns are:
+
+| Field | What to record |
+|---|---|
+| athlete, gender, college | Runner identity and college team |
+| high_school_5k, hs_race_date | Verified high-school 5K time and date |
+| college_distance, college_time, college_race_date | College 6K or 8K result |
+| hs_weather, college_weather | Reported conditions or temperature |
+| hs_terrain, college_terrain | Course description, such as flat or hilly |
+| hs_source, college_source | Links to the supporting result pages |
+
+Weather and terrain may not be listed on TFRRS result pages, so I will only
+include those variables when I can verify them from a meet or course source.
+
+## Comparing finish times
+
+The graphs below compare the average high-school 5K time with an estimated
+college 5K time for men and women. Since the recorded college races are 6K or
+8K, their times are scaled to 5K using the same average pace. These college
+5K times are estimates, not actual 5K results.
+
+To make the graphs, save the verified data as `runners.csv` in this folder.
+Use one row per runner, and enter `high_school_5k` and `college_time` in
+seconds (for example, 17:30 is 1,050 seconds). The CSV must also include
+`gender` and `college_distance` columns.
+
+```{r}
+library(dplyr)
+library(ggplot2)
+library(readr)
+library(tibble)
+library(tidyr)
+
+if (file.exists("runners.csv")) {
+  runners <- read_csv("runners.csv", show_col_types = FALSE)
+
+  required_columns <- c(
+    "gender", "high_school_5k", "college_distance", "college_time"
+  )
+
+  if (!all(required_columns %in% names(runners))) {
+    stop("runners.csv must include: ", paste(required_columns, collapse = ", "))
+  }
+
+  plot_data <- runners |>
+    mutate(
+      gender = case_when(
+        tolower(gender) %in% c("female", "women", "f") ~ "Female",
+        tolower(gender) %in% c("male", "men", "m") ~ "Male",
+        TRUE ~ NA_character_
+      ),
+      college_distance = paste0(
+        gsub("[^0-9]", "", college_distance),
+        "K"
+      ),
+      college_distance_km = as.numeric(gsub("[^0-9]", "", college_distance))
+    ) |>
+    filter(
+      gender %in% c("Female", "Male"),
+      college_distance %in% c("6K", "8K"),
+      !is.na(high_school_5k),
+      !is.na(college_time),
+      high_school_5k > 0,
+      college_time > 0
+    ) |>
+    mutate(college_5k_equivalent = college_time * 5 / college_distance_km)
+} else {
+  plot_data <- tibble(
+    gender = character(),
+    high_school_5k = numeric(),
+    college_5k_equivalent = numeric()
+  )
+}
+
+average_times <- plot_data |>
+  group_by(gender) |>
+  summarise(
+    high_school_5k = mean(high_school_5k) / 60,
+    college_5k = mean(college_5k_equivalent) / 60,
+    runners = n(),
+    .groups = "drop"
+  ) |>
+  pivot_longer(
+    cols = c(high_school_5k, college_5k),
+    names_to = "stage",
+    values_to = "average_minutes"
+  ) |>
+  mutate(
+    stage = factor(
+      recode(
+        stage,
+        high_school_5k = "High school",
+        college_5k = "College (estimated)"
+      ),
+      levels = c("High school", "College (estimated)")
+    )
+  )
+```
+
+### Female runners
+
+```{r}
+if (nrow(average_times |> filter(gender == "Female")) > 0) {
+  print(
+    average_times |>
+      filter(gender == "Female") |>
+      ggplot(aes(x = stage, y = average_minutes)) +
+      geom_col(fill = "steelblue") +
+      labs(
+        title = "Average 5K Times: Women",
+        x = NULL,
+        y = "Average time (minutes)",
+        caption = "College 5K times are estimated by scaling each 6K/8K result to 5K at the same pace."
+      ) +
+      theme_minimal()
+  )
+} else {
+  cat("Add matched female runner records to runners.csv to create this graph.")
+}
+```
+
+### Male runners
+
+```{r}
+if (nrow(average_times |> filter(gender == "Male")) > 0) {
+  print(
+    average_times |>
+      filter(gender == "Male") |>
+      ggplot(aes(x = stage, y = average_minutes)) +
+      geom_col(fill = "darkorange") +
+      labs(
+        title = "Average 5K Times: Men",
+        x = NULL,
+        y = "Average time (minutes)",
+        caption = "College 5K times are estimated by scaling each 6K/8K result to 5K at the same pace."
+      ) +
+      theme_minimal()
+  )
+} else {
+  cat("Add matched male runner records to runners.csv to create this graph.")
+}
+```
