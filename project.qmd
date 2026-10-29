@@ -1,0 +1,5 @@
+---
+title: "Project"
+format: html
+---
+Some variables i plan to use is weather, if it was a sunny day or if it was rainy, if it was 90 degrees or if it was 60 degrees , additonally i want to look at the physical course the athletes ran on, for example was it super hilly or was it a flat downhill course.
